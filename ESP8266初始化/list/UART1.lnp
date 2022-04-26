@@ -1,0 +1,8 @@
+".\list\delay.obj",
+".\list\main.obj",
+".\list\GPIO.obj",
+".\list\UART.obj",
+".\list\STC8G_H_Soft_I2C.obj" 
+TO ".\list\UART1" 
+
+PRINT(".\list\UART1.map")

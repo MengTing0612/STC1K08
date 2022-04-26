@@ -1,0 +1,372 @@
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAX30102
+OBJECT MODULE PLACED IN .\list\Max30102.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE Max30102.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE DEBUG PRINT(.\list\Max301
+                    -02.lst) TABS(2) OBJECT(.\list\Max30102.obj)
+
+line level    source
+
+   1          //#include "IIC.h"
+   2          #include  "STC8G_H_Soft_I2C.h"
+   3          #include "Max30102.h"
+   4          #include "delay.h"
+   5          
+   6          
+   7          //¸½¼Óº¯Êý
+   8          void IIC_Write_One_Byte(unsigned char daddr,unsigned char addr,unsigned char Data)
+   9          {                                                    
+  10   1        I2C_Start();  
+  11   1        I2C_WriteAbyte(daddr);      //·¢ËÍÐ´ÃüÁî
+  12   1        I2C_Check_ACK();
+  13   1        I2C_WriteAbyte(addr);//·¢ËÍµØÖ·
+  14   1        I2C_Check_ACK();                       
+  15   1        I2C_WriteAbyte(Data);     //·¢ËÍ×Ö½Ú                 
+  16   1        I2C_Check_ACK();               
+  17   1        I2C_Stop();//²úÉúÒ»¸öÍ£Ö¹Ìõ¼þ 
+  18   1        delay_ms(10);  
+  19   1      }
+  20          void IIC_Read_One_Byte(unsigned char daddr,unsigned char addr,unsigned char *Data)
+  21          {
+  22   1        I2C_Start();  
+  23   1        I2C_WriteAbyte(daddr);      //·¢ËÍÐ´ÃüÁî
+  24   1        I2C_Check_ACK();
+  25   1        I2C_WriteAbyte(addr);//·¢ËÍµØÖ·
+  26   1        I2C_Check_ACK();    
+  27   1        I2C_Start();  
+  28   1        I2C_WriteAbyte(daddr|0x01);
+  29   1        I2C_Check_ACK();
+  30   1        *Data=I2C_ReadAbyte();
+  31   1        S_NoACK();
+  32   1        I2C_Stop();//²úÉúÒ»¸öÍ£Ö¹Ìõ¼þ 
+  33   1        
+  34   1      } 
+  35          void IIC_ReadBytes(unsigned char deviceAddr,unsigned char writeAddr,unsigned char *Data,unsigned char data
+             -Length)
+  36          {   
+  37   1        unsigned char i;  
+  38   1        I2C_Start();  
+  39   1        I2C_WriteAbyte(deviceAddr);     //·¢ËÍÐ´ÃüÁî
+  40   1        I2C_Check_ACK();
+  41   1        I2C_WriteAbyte(writeAddr);
+  42   1        I2C_Check_ACK();
+  43   1        I2C_WriteAbyte(deviceAddr|0X01);//½øÈë½ÓÊÕÄ£Ê½         
+  44   1        I2C_Check_ACK();
+  45   1        for(i=0;i<dataLength-1;i++)
+  46   1        {
+  47   2          Data[i] = I2C_ReadAbyte();
+  48   2          S_ACK();
+  49   2        }   
+  50   1        Data[dataLength-1] = I2C_ReadAbyte();
+  51   1        S_NoACK();
+  52   1        I2C_Stop();//²úÉúÒ»¸öÍ£Ö¹Ìõ¼þ 
+  53   1        delay_ms(10); 
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 2   
+
+  54   1      }
+  55          
+  56          
+  57          //MAX30102Ð´¼Ä´æÆ÷º¯Êý
+  58          void max30102_Bus_Write(unsigned char Register_Address,unsigned char Word_Data)
+  59          {
+  60   1        /* µÚ1²½£º·¢ÆðI2C×ÜÏßÆô¶¯ÐÅºÅ */
+  61   1        I2C_Start();
+  62   1        /* µÚ2²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+  63   1        I2C_WriteAbyte(max30102_WR_address | I2C_WR); /* ´Ë´¦ÊÇÐ´Ö¸Áî */
+  64   1        /* µÚ3²½£º½ÓÊÕACK */
+  65   1        I2C_Check_ACK();//IIC½ÓÊÕÓ¦´ð
+  66   1        /* µÚ4²½£º·¢ËÍ×Ö½ÚµØÖ· */
+  67   1        I2C_WriteAbyte(Register_Address);
+  68   1        /* µÚ5²½£º½ÓÊÕACK */
+  69   1        I2C_Check_ACK();//IIC½ÓÊÕÓ¦´ð
+  70   1        /* µÚ6²½£º¿ªÊ¼Ð´ÈëÊý¾Ý */
+  71   1        I2C_WriteAbyte(Word_Data);
+  72   1        /* µÚ7²½£º½ÓÊÕACK */
+  73   1        I2C_Check_ACK();//IIC½ÓÊÕÓ¦´ð
+  74   1        /* ·¢ËÍI2C×ÜÏßÍ£Ö¹ÐÅºÅ */
+  75   1        I2C_Stop();//IIC½áÊø
+  76   1      }
+  77          
+  78          //MAX30102¶Á¼Ä´æÆ÷º¯Êý
+  79          unsigned char max30102_Bus_Read(unsigned char Register_Address)
+  80          {
+  81   1        unsigned char Data;
+  82   1        /* µÚ1²½£º·¢ÆðI2C×ÜÏßÆô¶¯ÐÅºÅ */
+  83   1        I2C_Start();
+  84   1        /* µÚ2²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+  85   1        I2C_WriteAbyte(max30102_WR_address | I2C_WR); /* ´Ë´¦ÊÇÐ´Ö¸Áî */
+  86   1        /* µÚ3²½£º½ÓÊÕACK */
+  87   1        I2C_Check_ACK();
+  88   1        /* µÚ4²½£º·¢ËÍ×Ö½ÚµØÖ·£¬ */
+  89   1        I2C_WriteAbyte(Register_Address);
+  90   1        /* µÚ5²½£º½ÓÊÕACK */
+  91   1        I2C_Check_ACK();
+  92   1        /* µÚ6²½£ºÖØÐÂÆô¶¯I2C×ÜÏß¡£ÏÂÃæ¿ªÊ¼¶ÁÈ¡Êý¾Ý */
+  93   1        I2C_Start();
+  94   1        /* µÚ7²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+  95   1        I2C_WriteAbyte(max30102_WR_address | I2C_RD); /* ´Ë´¦ÊÇ¶ÁÖ¸Áî */
+  96   1        /* µÚ8²½£º½ÓÊÕACK */
+  97   1         I2C_Check_ACK();
+  98   1        /* µÚ9²½£º¶ÁÈ¡Êý¾Ý */
+  99   1        Data = I2C_ReadAbyte(); /* ¶Á1¸ö×Ö½Ú */
+ 100   1        /* µÚ10²½£º·¢ËÍACK */
+ 101   1        S_NoACK();
+ 102   1        /* ·¢ËÍI2C×ÜÏßÍ£Ö¹ÐÅºÅ */
+ 103   1        I2C_Stop();//IIC½áÊø
+ 104   1        return Data;  /* Ö´ÐÐ³É¹¦ ·µ»ØdataÖµ */
+ 105   1      }
+ 106          
+ 107          //MAX30102¶Á»º³åÆ÷FIFO Words
+ 108          void max30102_FIFO_ReadWords(unsigned char Register_Address,unsigned int Word_Data[][2],unsigned char coun
+             -t)
+ 109          {
+ 110   1        unsigned char i=0;
+ 111   1        unsigned char no = count;
+ 112   1        unsigned char data1, data2;
+ 113   1        /* µÚ1²½£º·¢ÆðI2C×ÜÏßÆô¶¯ÐÅºÅ */
+ 114   1        I2C_Start();
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 3   
+
+ 115   1        /* µÚ2²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 116   1        I2C_WriteAbyte(max30102_WR_address | I2C_WR); /* ´Ë´¦ÊÇÐ´Ö¸Áî */
+ 117   1        /* µÚ3²½£º½ÓÊÕACK */
+ 118   1        I2C_Check_ACK();
+ 119   1        /* µÚ4²½£º·¢ËÍ×Ö½ÚµØÖ·£¬ */
+ 120   1        I2C_WriteAbyte(Register_Address);
+ 121   1        /* µÚ5²½£º½ÓÊÕACK */
+ 122   1         I2C_Check_ACK();
+ 123   1        /* µÚ6²½£ºÖØÐÂÆô¶¯I2C×ÜÏß¡£ÏÂÃæ¿ªÊ¼¶ÁÈ¡Êý¾Ý */
+ 124   1        I2C_Start();
+ 125   1        /* µÚ7²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 126   1        I2C_WriteAbyte(max30102_WR_address | I2C_RD); /* ´Ë´¦ÊÇ¶ÁÖ¸Áî */
+ 127   1        /* µÚ8²½£º½ÓÊÕACK */
+ 128   1        I2C_Check_ACK();
+ 129   1        /* µÚ9²½£º¶ÁÈ¡Êý¾Ý */
+ 130   1        while (no)
+ 131   1        {
+ 132   2          data1 = I2C_ReadAbyte();
+ 133   2          S_ACK();
+ 134   2          data2 = I2C_ReadAbyte();
+ 135   2          S_ACK();
+ 136   2          Word_Data[i][0] = (((unsigned int)data1 << 8) | data2);  //
+ 137   2          data1 = I2C_ReadAbyte();
+ 138   2          S_ACK();
+ 139   2          data2 = I2C_ReadAbyte();
+ 140   2          if(1==no)
+ 141   2            S_NoACK();/* ×îºó1¸ö×Ö½Ú¶ÁÍêºó£¬CPU²úÉúNACKÐÅºÅ(Çý¶¯SDA = 1) */
+ 142   2          else
+ 143   2            S_ACK();
+ 144   2          Word_Data[i][1] = (((unsigned int)data1 << 8) | data2); 
+ 145   2          no--; 
+ 146   2          i++;
+ 147   2        }
+ 148   1        /* ·¢ËÍI2C×ÜÏßÍ£Ö¹ÐÅºÅ */
+ 149   1        I2C_Stop();//IIC½áÊø
+ 150   1      }
+ 151          
+ 152          //MAX30102¶Á»º³åÆ÷FIFO Bytes
+ 153          void max30102_FIFO_ReadBytes(unsigned char Register_Address,unsigned char *Data)
+ 154          {
+ 155   1        max30102_Bus_Read(REG_INTR_STATUS_1);//Çå³ýÐÄÂÊÑªÑõÖÐ¶Ï
+ 156   1        max30102_Bus_Read(REG_INTR_STATUS_2);//Çå³ýÎÂ¶ÈÖÐ¶Ï
+ 157   1        /* µÚ1²½£º·¢ÆðI2C×ÜÏßÆô¶¯ÐÅºÅ */
+ 158   1        I2C_Start();
+ 159   1        /* µÚ2²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 160   1        I2C_WriteAbyte(max30102_WR_address | I2C_WR); /* ´Ë´¦ÊÇÐ´Ö¸Áî */
+ 161   1        /* µÚ3²½£º½ÓÊÕACK */
+ 162   1        I2C_Check_ACK();
+ 163   1        /* µÚ4²½£º·¢ËÍ×Ö½ÚµØÖ·£¬ */
+ 164   1        I2C_WriteAbyte(Register_Address);
+ 165   1        /* µÚ5²½£º½ÓÊÕACK */
+ 166   1        I2C_Check_ACK();
+ 167   1        /* µÚ6²½£ºÖØÐÂÆô¶¯I2C×ÜÏß¡£ÏÂÃæ¿ªÊ¼¶ÁÈ¡Êý¾Ý */
+ 168   1        I2C_Start();
+ 169   1        /* µÚ7²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 170   1        I2C_WriteAbyte(max30102_WR_address | I2C_RD); /* ´Ë´¦ÊÇ¶ÁÖ¸Áî */
+ 171   1        /* µÚ8²½£º½ÓÊÕACK */
+ 172   1         I2C_Check_ACK();
+ 173   1        /* µÚ9²½£º¶ÁÈ¡Êý¾Ý */
+ 174   1        Data[0]=I2C_ReadAbyte();
+ 175   1        S_ACK();
+ 176   1        Data[1]=I2C_ReadAbyte();
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 4   
+
+ 177   1        S_ACK();
+ 178   1        Data[2]=I2C_ReadAbyte();
+ 179   1        S_ACK();
+ 180   1        Data[3]=I2C_ReadAbyte();
+ 181   1        S_ACK();
+ 182   1        Data[4]=I2C_ReadAbyte();
+ 183   1        S_ACK();
+ 184   1        Data[5]=I2C_ReadAbyte();
+ 185   1        S_NoACK();
+ 186   1        /* ·¢ËÍI2C×ÜÏßÍ£Ö¹ÐÅºÅ */
+ 187   1        I2C_Stop();//IIC½áÊø
+ 188   1        
+ 189   1      }
+ 190          
+ 191          //MAX30102¶Á»º³åÆ÷FIFO Data
+ 192          void MAX30102_FIFO_ReadData(unsigned long *Red,unsigned long *Ir)
+ 193          {
+ 194   1        unsigned char tem[6];
+ 195   1        unsigned long un_temp=0;
+ 196   1        *Red=0;
+ 197   1        *Ir=0;
+ 198   1        max30102_Bus_Read(REG_INTR_STATUS_1);//Çå³ýÐÄÂÊÑªÑõÖÐ¶Ï
+ 199   1        max30102_Bus_Read(REG_INTR_STATUS_2);//Çå³ýÎÂ¶ÈÖÐ¶Ï
+ 200   1        /* µÚ1²½£º·¢ÆðI2C×ÜÏßÆô¶¯ÐÅºÅ */
+ 201   1        I2C_Start();
+ 202   1        /* µÚ2²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 203   1        I2C_WriteAbyte(max30102_WR_address | I2C_WR); /* ´Ë´¦ÊÇÐ´Ö¸Áî */
+ 204   1        /* µÚ3²½£º½ÓÊÕACK */
+ 205   1        I2C_Check_ACK();
+ 206   1        /* µÚ4²½£º·¢ËÍ×Ö½ÚµØÖ·£¬ */
+ 207   1        I2C_WriteAbyte(REG_FIFO_DATA);
+ 208   1        /* µÚ5²½£º½ÓÊÕACK */
+ 209   1        I2C_Check_ACK();
+ 210   1        /* µÚ6²½£ºÖØÐÂÆô¶¯I2C×ÜÏß¡£ÏÂÃæ¿ªÊ¼¶ÁÈ¡Êý¾Ý */
+ 211   1        I2C_Start();
+ 212   1        /* µÚ7²½£º·¢Æð¿ØÖÆ×Ö½Ú£¬¸ß7bitÊÇµØÖ·£¬bit0ÊÇ¶ÁÐ´¿ØÖÆÎ»£¬0±íÊ¾Ð´£¬1±íÊ¾¶Á */
+ 213   1        I2C_WriteAbyte(max30102_WR_address | I2C_RD); /* ´Ë´¦ÊÇ¶ÁÖ¸Áî */
+ 214   1        /* µÚ8²½£º½ÓÊÕACK */
+ 215   1        I2C_Check_ACK();
+ 216   1        /* µÚ9²½£º¶ÁÈ¡Êý¾Ý */
+ 217   1        tem[0]=I2C_ReadAbyte();
+ 218   1        S_ACK();
+ 219   1        tem[1]=I2C_ReadAbyte();
+ 220   1        S_ACK();
+ 221   1        tem[2]=I2C_ReadAbyte();
+ 222   1        S_ACK();
+ 223   1        tem[3]=I2C_ReadAbyte();
+ 224   1        S_ACK();
+ 225   1        tem[4]=I2C_ReadAbyte();
+ 226   1        S_ACK();
+ 227   1        tem[5]=I2C_ReadAbyte();
+ 228   1        S_NoACK();
+ 229   1        /* ·¢ËÍI2C×ÜÏßÍ£Ö¹ÐÅºÅ */
+ 230   1        I2C_Stop();//IIC½áÊø
+ 231   1        
+ 232   1        un_temp=tem[0];
+ 233   1        un_temp<<=16;
+ 234   1        *Red+=un_temp;  
+ 235   1        un_temp=tem[1];
+ 236   1        un_temp<<=8;
+ 237   1        *Red+=un_temp;  
+ 238   1        un_temp=tem[2];
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 5   
+
+ 239   1        *Red+=un_temp;
+ 240   1        
+ 241   1        un_temp=tem[3];
+ 242   1        un_temp<<=16;
+ 243   1        *Ir+=un_temp; 
+ 244   1        un_temp=tem[4];
+ 245   1        un_temp<<=8;
+ 246   1        *Ir+=un_temp; 
+ 247   1        un_temp=tem[5];
+ 248   1        *Ir+=un_temp;
+ 249   1        
+ 250   1        *Red&=0x03FFFF;  //Mask MSB [23:18]
+ 251   1        *Ir&=0x03FFFF;  //Mask MSB [23:18]
+ 252   1      }
+ 253          
+ 254          void max30102_reset()
+ 255          {
+ 256   1        max30102_Bus_Write(REG_MODE_CONFIG,0x40);
+ 257   1        max30102_Bus_Write(REG_MODE_CONFIG,0x40);
+ 258   1      }
+ 259          
+ 260          //MAX30102³õÊ¼»¯£¨¿É¸ù¾Ý×Ô¼ºµÄÊµ¼ÊÇé¿ö¸ü¸ÄÏàÓ¦µÄÅäÖÃ£©
+ 261          void max30102_init()
+ 262          {
+ 263   1        
+ 264   1        max30102_reset();//max30102¸´Î»
+ 265   1        
+ 266   1        max30102_Bus_Write(REG_INTR_ENABLE_1,0xC0); //  Interrupt Enable  02->C0
+ 267   1        max30102_Bus_Write(REG_INTR_ENABLE_2,0x00); //  Interrupt Enable  03->00
+ 268   1        
+ 269   1        max30102_Bus_Write(REG_FIFO_WR_PTR,0x00);   //              FIFO  04->00       FIFO_WR_PTR[4:0] FIFOÐ´Ö¸Õ
+             -ëÖ¸ÏòÏÂÒ»¸öÒªÐ´µÄÄÚ´æµØÖ·
+ 270   1        max30102_Bus_Write(REG_OVF_COUNTER,0x00);   //              FIFO  05->00       OVF_COUNTER[4:0] FIFOÒç³ö¶
+             -ªÊ§Êý¾Ý¼ÆÊý  
+ 271   1        max30102_Bus_Write(REG_FIFO_RD_PTR,0x00);   //              FIFO  06->00       FIFO_RD_PTR[4:0] FIFO¶ÁÖ¸Õ
+             -ëÖ¸ÏòÏÂÒ»¸öÒª¶ÁµÄÄÚ´æµØÖ·
+ 272   1        
+ 273   1        max30102_Bus_Write(REG_FIFO_CONFIG,0x0f);   //FIFO Configuration  08->0f       sample avg = 1, fifo rollo
+             -ver=false, fifo almost full = 17
+ 274   1        max30102_Bus_Write(REG_MODE_CONFIG,0x03);   //Mode Configuration  09->03       0x02 for Red only, 0x03 fo
+             -r SpO2 mode, 0x07 multimode LED
+ 275   1        max30102_Bus_Write(REG_SPO2_CONFIG,0x27);   //SpO2 Configuration  0A->27       SPO2_ADC range = 4096nA, S
+             -PO2 sample rate (100 Hz), LED pulseWidth (400uS)  0x0A
+ 276   1        max30102_Bus_Write(REG_LED1_PA,0x24);       //LED Pulse Amplitude 0C->7F       Choose value for ~ 7.0mA fo
+             -r LED1
+ 277   1        max30102_Bus_Write(REG_LED2_PA,0x24);       //LED Pulse Amplitude 0D->3F       Choose value for ~ 7.0mA fo
+             -r LED2
+ 278   1        max30102_Bus_Write(REG_PILOT_PA,0x7F);      //LED Pulse Amplitude 10->7F       Choose value for ~ 25mA fo
+             -r Pilot LED          
+ 279   1      }
+ 280          
+ 281          void maxim_max30102_write_reg(unsigned char uch_addr,unsigned char uch_data)
+ 282          {
+ 283   1        IIC_Write_One_Byte(I2C_WRITE_ADDR, uch_addr, uch_data);
+ 284   1      }
+ 285          
+ 286          void maxim_max30102_read_reg(unsigned char uch_addr, unsigned char *puch_data)
+ 287          {
+ 288   1        IIC_Read_One_Byte(I2C_WRITE_ADDR,uch_addr,puch_data);
+ 289   1      }
+ 290          
+ 291          void maxim_max30102_read_fifo(unsigned long *pun_red_led,unsigned long *pun_ir_led)
+C51 COMPILER V9.54   MAX30102                                                              04/26/2022 22:30:02 PAGE 6   
+
+ 292          {
+ 293   1        unsigned long un_temp=0;
+ 294   1        unsigned char uch_temp=0;
+ 295   1        unsigned char ach_i2c_data[6];
+ 296   1        *pun_red_led=0;
+ 297   1        *pun_ir_led=0;
+ 298   1        
+ 299   1        maxim_max30102_read_reg(REG_INTR_STATUS_1, &uch_temp);
+ 300   1        maxim_max30102_read_reg(REG_INTR_STATUS_2, &uch_temp);
+ 301   1        
+ 302   1        IIC_ReadBytes(I2C_WRITE_ADDR,REG_FIFO_DATA,ach_i2c_data,6);
+ 303   1        
+ 304   1        un_temp=ach_i2c_data[0];
+ 305   1        un_temp<<=16;
+ 306   1        *pun_red_led+=un_temp;
+ 307   1        un_temp=ach_i2c_data[1];
+ 308   1        un_temp<<=8;
+ 309   1        *pun_red_led+=un_temp;
+ 310   1        un_temp=ach_i2c_data[2];
+ 311   1        *pun_red_led+=un_temp;
+ 312   1        
+ 313   1        un_temp=ach_i2c_data[3];
+ 314   1        un_temp<<=16;
+ 315   1        *pun_ir_led+=un_temp;
+ 316   1        un_temp=ach_i2c_data[4];
+ 317   1        un_temp<<=8;
+ 318   1        *pun_ir_led+=un_temp;
+ 319   1        un_temp=ach_i2c_data[5];
+ 320   1        *pun_ir_led+=un_temp;
+ 321   1        *pun_red_led&=0x03FFFF;  //Mask MSB [23:18]
+ 322   1        *pun_ir_led&=0x03FFFF;  //Mask MSB [23:18]
+ 323   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2240    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      65
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

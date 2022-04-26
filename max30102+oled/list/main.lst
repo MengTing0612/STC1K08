@@ -1,0 +1,393 @@
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\list\main.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE main.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE DEBUG PRINT(.\list\main.lst) 
+                    -TABS(2) OBJECT(.\list\main.obj)
+
+line level    source
+
+   1          /*---------------------------------------------------------------------*/
+   2          /* --- STC MCU Limited ------------------------------------------------*/
+   3          /* --- STC 1T Series MCU Demo Programme -------------------------------*/
+   4          /* --- Mobile: (86)13922805190 ----------------------------------------*/
+   5          /* --- Fax: 86-0513-55012956,55012947,55012969 ------------------------*/
+   6          /* --- Tel: 86-0513-55012928,55012929,55012966 ------------------------*/
+   7          /* --- Web: www.STCMCU.com --------------------------------------------*/
+   8          /* --- Web: www.STCMCUDATA.com  ---------------------------------------*/
+   9          /* --- QQ:  800003751 -------------------------------------------------*/
+  10          /* 如果要在程序中使用此代码,请在程序中注明使用了STC的资料及程序            */
+  11          /*---------------------------------------------------------------------*/
+  12          
+  13          #include  "config.h"
+  14          #include  "GPIO.h"
+  15          #include  "delay.h"
+  16          #include  "STC8G_H_Soft_I2C.h"
+  17          #include  "UART.h"
+  18          #include  "Max30102.h"
+  19          #include  "oled.h"
+  20          #include  "I2C.h"
+  21          #include  "adc.h"
+  22          #include  "stdio.h"
+  23          #include  "string.h"
+  24          /***************  功能说明  ****************
+  25          
+  26          本例程基于STC8H8K64U为主控芯片的实验箱8进行编写测试，STC8G、STC8H系列芯片可通用参考.
+  27          
+  28          程序使用P6口来演示跑马灯，输出低驱动。
+  29          
+  30          下载时, 选择时钟 24MHz (可以在配置文件"config.h"中修改).
+  31          
+  32          ******************************************/
+  33          
+  34          /*************  本地常量声明  **************/
+  35          u8 code ledNum[]={0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80}; //直接储存在程序存储器中
+  36          
+  37          
+  38          /*************  本地变量声明  **************/
+  39          unsigned long Red=0;
+  40          unsigned long Ir=0;
+  41          u8 packet0[7];
+  42          u8 packet1[7];
+  43          unsigned char Heart=88;
+  44          unsigned char Spo2=97;
+  45          u16 over_load_count = 0; //溢出次数
+  46          u16 adc_catch_count = 0; //ADC采集次数
+  47          float avgADC0 = 0 ; //ADC均值
+  48          float avgADC1 = 0 ; //ADC均值
+  49          float avgADC2 = 0 ; //ADC均值
+  50          float avgADC3 = 0 ; //ADC均值
+  51          char strTemp0[8];
+  52          char strTemp1[8];
+  53          char strTemp2[8];
+  54          char strTemp3[8];
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 2   
+
+  55          u8 TX_data[7]=0;
+  56          u8 timeIsOver = 0;
+  57          
+  58          /*************  本地函数声明  **************/
+  59          void cratepacket0()
+  60          {
+  61   1         packet0[0]=(unsigned char)(48+(Red/1000000)%10);
+  62   1         packet0[1]=(unsigned char)(48+(Red/100000)%10);
+  63   1         packet0[2]=(unsigned char)(48+(Red/10000)%10);
+  64   1         packet0[3]=(unsigned char)(48+(Red/1000)%10);
+  65   1         packet0[4]=(unsigned char)(48+(Red/100)%10);
+  66   1         packet0[5]=(unsigned char)(48+(Red/10)%10);
+  67   1         packet0[6]=(unsigned char)(48+(Red%10));
+  68   1      }
+  69          void cratepacket1()
+  70          {
+  71   1         packet1[0]=(unsigned char)(48+(Ir/1000000)%10);
+  72   1         packet1[1]=(unsigned char)(48+(Ir/100000)%10);
+  73   1         packet1[2]=(unsigned char)(48+(Ir/10000)%10);
+  74   1         packet1[3]=(unsigned char)(48+(Ir/1000)%10);
+  75   1         packet1[4]=(unsigned char)(48+(Ir/100)%10);
+  76   1         packet1[5]=(unsigned char)(48+(Ir/10)%10);
+  77   1         packet1[6]=(unsigned char)(48+(Ir%10));
+  78   1      }
+  79           
+  80          void GetADC()
+  81          {
+  82   1        u8 k;
+  83   1        for(k=0;k<5;k++)
+  84   1        {
+  85   2        avgADC0 += Get_ADCResult(2);
+  86   2        avgADC1 += Get_ADCResult(3);
+  87   2        avgADC2 += Get_ADCResult(6);
+  88   2        avgADC3 += Get_ADCResult(7);
+  89   2        }
+  90   1        avgADC0 /= 5;
+  91   1        avgADC1 /= 5;
+  92   1        avgADC2 /= 5;
+  93   1        avgADC3 /= 5;
+  94   1        
+  95   1        memset(strTemp0, 0, sizeof(strTemp0));
+  96   1        memset(strTemp1, 0, sizeof(strTemp1));
+  97   1        memset(strTemp2, 0, sizeof(strTemp2));
+  98   1        memset(strTemp3, 0, sizeof(strTemp3));
+  99   1      
+ 100   1        sprintf(strTemp0,"%.04f", avgADC0);//将浮点数转成字符串
+ 101   1        sprintf(strTemp1,"%.04f", avgADC1);//将浮点数转成字符串
+ 102   1        sprintf(strTemp2,"%.04f", avgADC2);//将浮点数转成字符串
+ 103   1        sprintf(strTemp3,"%.04f", avgADC3);//将浮点数转成字符串
+ 104   1        
+ 105   1      
+ 106   1      }
+ 107          
+ 108          void SendADC()
+ 109          {
+ 110   1        u8 j;
+ 111   1        //A通道 
+ 112   1        TX_data[0]=strTemp0[0];
+ 113   1        TX_data[1]=strTemp0[1];
+ 114   1        TX_data[2]=strTemp0[2];
+ 115   1        TX_data[3]=strTemp0[3];
+ 116   1        TX_data[4]=strTemp0[4];
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 3   
+
+ 117   1        TX_data[5]=strTemp0[5];
+ 118   1        TX_data[6]=strTemp0[6];
+ 119   1        TX_data[7]=strTemp0[7];
+ 120   1        
+ 121   1        PrintString1("A:");
+ 122   1        for(j=0;j<8;j++)
+ 123   1        {
+ 124   2          TX1_write2buff(TX_data[j]);       //通过串口发给PC
+ 125   2        }
+ 126   1          PrintString1("\r\n");
+ 127   1      //B通道 
+ 128   1        TX_data[0]=strTemp1[0];
+ 129   1        TX_data[1]=strTemp1[1];
+ 130   1        TX_data[2]=strTemp1[2];
+ 131   1        TX_data[3]=strTemp1[3];
+ 132   1        TX_data[4]=strTemp1[4];
+ 133   1        TX_data[5]=strTemp1[5];
+ 134   1        TX_data[6]=strTemp1[6];
+ 135   1        TX_data[7]=strTemp1[7];
+ 136   1        
+ 137   1        PrintString1("B:");
+ 138   1        for(j=0;j<8;j++)
+ 139   1        {
+ 140   2          TX1_write2buff(TX_data[j]);       //通过串口发给PC
+ 141   2        }
+ 142   1          PrintString1("\r\n");
+ 143   1      //C通道
+ 144   1        TX_data[0]=strTemp2[0];
+ 145   1        TX_data[1]=strTemp2[1];
+ 146   1        TX_data[2]=strTemp2[2];
+ 147   1        TX_data[3]=strTemp2[3];
+ 148   1        TX_data[4]=strTemp2[4];
+ 149   1        TX_data[5]=strTemp2[5];
+ 150   1        TX_data[6]=strTemp2[6];
+ 151   1        TX_data[7]=strTemp2[7];
+ 152   1        
+ 153   1        PrintString1("C:");
+ 154   1        for(j=0;j<8;j++)
+ 155   1        {
+ 156   2          TX1_write2buff(TX_data[j]);       //通过串口发给PC
+ 157   2        }
+ 158   1          PrintString1("\r\n");
+ 159   1      //D
+ 160   1        TX_data[0]=strTemp3[0];
+ 161   1        TX_data[1]=strTemp3[1];
+ 162   1        TX_data[2]=strTemp3[2];
+ 163   1        TX_data[3]=strTemp3[3];
+ 164   1        TX_data[4]=strTemp3[4];
+ 165   1        TX_data[5]=strTemp3[5];
+ 166   1        TX_data[6]=strTemp3[6];
+ 167   1        TX_data[7]=strTemp3[7];
+ 168   1        
+ 169   1        PrintString1("D:");
+ 170   1        for(j=0;j<8;j++)
+ 171   1        {
+ 172   2          TX1_write2buff(TX_data[j]);       //通过串口发给PC
+ 173   2        }
+ 174   1          PrintString1("\r\n");
+ 175   1        
+ 176   1      } 
+ 177          /*************  外部函数和变量声明 *****************/
+ 178          
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 4   
+
+ 179          
+ 180          /******************** IO配置函数 **************************/
+ 181          void  GPIO_config(void)
+ 182          {
+ 183   1        GPIO_InitTypeDef  GPIO_InitStructure;   //结构定义
+ 184   1        GPIO_InitStructure.Pin  = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_0 | GPIO_Pin_1;    //指定要初始化的IO,
+ 185   1        GPIO_InitStructure.Mode = GPIO_PullUp;    //指定IO的输入或输出方式,GPIO_PullUp,GPIO_HighZ,GPIO_OUT_OD,GPIO_
+             -OUT_PP
+ 186   1        GPIO_Inilize(GPIO_P1,&GPIO_InitStructure);  //初始化
+ 187   1        
+ 188   1        GPIO_InitStructure.Pin  = GPIO_Pin_7| GPIO_Pin_6|GPIO_Pin_2 | GPIO_Pin_3;   //指定要初始化的IO,
+ 189   1        GPIO_InitStructure.Mode = GPIO_HighZ;   //指定IO的输入或输出方式,GPIO_PullUp,GPIO_HighZ,GPIO_OUT_OD,GPIO_O
+             -UT_PP
+ 190   1        GPIO_Inilize(GPIO_P3,&GPIO_InitStructure);  //初始化
+ 191   1      
+ 192   1        GPIO_InitStructure.Pin  = GPIO_Pin_0 | GPIO_Pin_1|GPIO_Pin_6 | GPIO_Pin_5;    //指定要初始化的IO, GPIO_Pin_
+             -0 ~ GPIO_Pin_7
+ 193   1        GPIO_InitStructure.Mode = GPIO_PullUp;    //指定IO的输入或输出方式,GPIO_PullUp,GPIO_HighZ,GPIO_OUT_OD,GPIO_
+             -OUT_PP
+ 194   1        GPIO_Inilize(GPIO_P3,&GPIO_InitStructure);  //初始化
+ 195   1      }
+ 196          
+ 197          /***************  串口初始化函数 *****************/
+ 198          void  UART_config(void)
+ 199          {
+ 200   1      
+ 201   1        COMx_InitDefine   COMx_InitStructure;         //结构定义
+ 202   1        COMx_InitStructure.UART_Mode      = UART_8bit_BRTx;   //模式,       UART_ShiftRight,UART_8bit_BRTx,UART_9b
+             -it,UART_9bit_BRTx
+ 203   1        COMx_InitStructure.UART_BRT_Use   = BRT_Timer1;     //使用波特率,   BRT_Timer1, BRT_Timer2 (注意: 串口2固定
+             -使用BRT_Timer2)
+ 204   1        COMx_InitStructure.UART_BaudRate  = 115200ul;     //波特率, 一般 110 ~ 115200
+ 205   1        COMx_InitStructure.UART_RxEnable  = ENABLE;       //接收允许,   ENABLE或DISABLE
+ 206   1        COMx_InitStructure.BaudRateDouble = DISABLE;      //波特率加倍, ENABLE或DISABLE
+ 207   1        COMx_InitStructure.UART_Interrupt = ENABLE;       //中断允许,   ENABLE或DISABLE
+ 208   1        COMx_InitStructure.UART_Polity    = Polity_1;     //指定中断优先级(低到高) Polity_0,Polity_1,Polity_2,Polit
+             -y_3
+ 209   1        COMx_InitStructure.UART_P_SW      = UART1_SW_P30_P31; //切换端口,   UART1_SW_P30_P31,UART1_SW_P36_P37,UAR
+             -T1_SW_P16_P17,UART1_SW_P43_P44
+ 210   1        UART_Configuration(UART1, &COMx_InitStructure);   //初始化串口1 UART1,UART2,UART3,UART4
+ 211   1      
+ 212   1        COMx_InitStructure.UART_Mode      = UART_8bit_BRTx;   //模式,       UART_ShiftRight,UART_8bit_BRTx,UART_9b
+             -it,UART_9bit_BRTx
+ 213   1        COMx_InitStructure.UART_BaudRate  = 115200ul;     //波特率,     110 ~ 115200
+ 214   1        COMx_InitStructure.UART_RxEnable  = ENABLE;       //接收允许,   ENABLE或DISABLE
+ 215   1        COMx_InitStructure.UART_Interrupt = ENABLE;       //中断允许,   ENABLE或DISABLE
+ 216   1        COMx_InitStructure.UART_Polity    = Polity_0;     //指定中断优先级(低到高) Polity_0,Polity_1,Polity_2,Polit
+             -y_3
+ 217   1        COMx_InitStructure.UART_P_SW      = UART2_SW_P10_P11; //切换端口,   UART2_SW_P10_P11,UART2_SW_P46_P47
+ 218   1        UART_Configuration(UART2, &COMx_InitStructure);   //初始化串口2 UART1,UART2,UART3,UART4
+ 219   1      
+ 220   1      
+ 221   1        PrintString1("STC8 UART1 Test Programme!\r\n"); //UART1发送一个字符串 
+ 222   1      }
+ 223          
+ 224          void  IIC_config(void)//仅提供参考
+ 225          {
+ 226   1         I2C_InitTypeDef  IIC_InitStructure;
+ 227   1         IIC_InitStructure.I2C_Speed=54;        //总线速度=Fosc/2/(Speed*2+4),      0~63
+ 228   1         IIC_InitStructure.I2C_Enable=ENABLE;        //I2C功能使能,   ENABLE, DISABLE
+ 229   1         IIC_InitStructure.I2C_Mode=I2C_Mode_Master; //主从模式选择,  I2C_Mode_Master,I2C_Mode_Slave
+ 230   1         IIC_InitStructure.I2C_MS_Interrupt= DISABLE; //使能主机模式中断,  ENABLE, DISABLE
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 5   
+
+ 231   1         IIC_InitStructure.I2C_MS_WDTA=DISABLE;  //主机使能自动发送,  ENABLE, DISABLE
+ 232   1         
+ 233   1         IIC_InitStructure.I2C_SL_ESTAI=DISABLE;      //从机接收START信号中断使能,  ENABLE, DISABLE
+ 234   1         IIC_InitStructure.I2C_SL_ERXI=DISABLE;     //从机接收1字节数据中断使能,  ENABLE, DISABLE
+ 235   1         IIC_InitStructure.I2C_SL_ETXI=DISABLE;     //从机发送1字节数据中断使能,  ENABLE, DISABLE
+ 236   1         IIC_InitStructure.I2C_SL_ESTOI=DISABLE;      //从机接收STOP信号中断使能,  ENABLE, DISABLE
+ 237   1        
+ 238   1         IIC_InitStructure.I2C_SL_ADR=0; //从机设备地址,  0~127
+ 239   1         IIC_InitStructure.I2C_SL_MA=DISABLE;       //从机设备地址比较使能,  ENABLE, DISABLE
+ 240   1      
+ 241   1         IIC_InitStructure.I2C_IoUse=I2C_P14_P15;
+ 242   1        
+ 243   1         I2C_Init(&IIC_InitStructure);
+ 244   1      }
+ 245          
+ 246          void  ADC_config(void)
+ 247          {
+ 248   1        ADC_InitTypeDef   ADC_InitStructure;    //结构定义
+ 249   1        ADC_InitStructure.ADC_SMPduty   = 31;   //ADC 模拟信号采样时间控制, 0~31（注意： SMPDUTY 一定不能设置小于 
+             -10）
+ 250   1        ADC_InitStructure.ADC_CsSetup   = 0;    //ADC 通道选择时间控制 0(默认),1
+ 251   1        ADC_InitStructure.ADC_CsHold    = 1;    //ADC 通道选择保持时间控制 0,1(默认),2,3
+ 252   1        ADC_InitStructure.ADC_Speed     = ADC_SPEED_2X1T;   //设置 ADC 工作时钟频率 ADC_SPEED_2X1T~ADC_SPEED_2X16T
+ 253   1        ADC_InitStructure.ADC_Power     = ENABLE;       //ADC功率允许/关闭  ENABLE,DISABLE
+ 254   1        ADC_InitStructure.ADC_AdjResult = ADC_RIGHT_JUSTIFIED;  //ADC结果调整,  ADC_LEFT_JUSTIFIED,ADC_RIGHT_JUSTIF
+             -IED
+ 255   1        ADC_InitStructure.ADC_Polity = Polity_1;      //优先级设置  PolityHigh,PolityLow
+ 256   1        ADC_InitStructure.ADC_Interrupt = DISABLE;      //中断允许  ENABLE,DISABLE
+ 257   1        ADC_Inilize(&ADC_InitStructure);          //初始化
+ 258   1        ADC_PowerControl(ENABLE);             //单独的ADC电源操作函数, ENABLE或DISABLE
+ 259   1      
+ 260   1      }
+ 261          
+ 262          void WIFIconfig()
+ 263          {
+ 264   1      
+ 265   1        PrintString2("AT+CIPSTART=\"TCP\",\"192.168.43.217\",8086\r\n");   
+ 266   1        delay_ms(5);  
+ 267   1        PrintString2("AT+CIPMODE=1");    
+ 268   1        delay_ms(5);
+ 269   1        PrintString2("AT+CIPSEND"); 
+ 270   1      }
+ 271          
+ 272          
+ 273          /******************** 主函数 **************************/
+ 274          void main(void)
+ 275          { 
+ 276   1        u8 i;
+ 277   1        GPIO_config();
+ 278   1        UART_config();
+ 279   1        IIC_config();
+ 280   1      //  max30102_init();
+ 281   1        OLED_Init();
+ 282   1      //  WIFIconfig();
+ 283   1        ADC_config();
+ 284   1        EA = 1;
+ 285   1        OLED_Clear();//oled清屏 
+ 286   1        OLED_ShowCHinese(0,0,0);
+ 287   1        OLED_ShowCHinese(18,0,1);
+ 288   1        OLED_ShowCHinese(36,0,2);
+ 289   1        OLED_ShowCHinese(54,0,3);
+ 290   1        OLED_ShowCHinese(72,0,4);
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 6   
+
+ 291   1        OLED_ShowCHinese(90,0,5);
+ 292   1        OLED_ShowCHinese(108,0,6);
+ 293   1        while(1)
+ 294   1        {
+ 295   2      //    MAX30102_FIFO_ReadData(&Red,&Ir);
+ 296   2      //    PrintString1("The Red_Number is:");
+ 297   2      //    cratepacket0();
+ 298   2      //    for(i=0;i<7;i++)
+ 299   2      //        TX1_write2buff(packet0[i]);
+ 300   2      //    
+ 301   2      //    PrintString1("     ");
+ 302   2      //    cratepacket1();
+ 303   2      //    for(i=0;i<7;i++)
+ 304   2      //        TX1_write2buff(packet1[i]);
+ 305   2      //    PrintString1("\r\n");
+ 306   2          GetADC();
+ 307   2          SendADC();
+ 308   2          delay_ms(10);
+ 309   2          
+ 310   2          
+ 311   2          
+ 312   2          OLED_Clear();//oled清屏
+ 313   2          OLED_ShowCHinese(0,0,0);
+ 314   2          OLED_ShowCHinese(18,0,1);
+ 315   2          OLED_ShowCHinese(36,0,2);
+ 316   2          OLED_ShowCHinese(54,0,3);
+ 317   2          OLED_ShowCHinese(72,0,4);
+ 318   2          OLED_ShowCHinese(90,0,5);
+ 319   2          OLED_ShowCHinese(108,0,6);
+ 320   2          
+ 321   2          OLED_ShowCHinese(0,3,0);//心
+ 322   2          OLED_ShowCHinese(18,3,1);//率
+ 323   2          OLED_ShowCHinese(36,3,6);//：
+ 324   2          
+ 325   2          OLED_ShowCHinese(0,6,2);//血
+ 326   2          OLED_ShowCHinese(18,6,3);//氧
+ 327   2          OLED_ShowCHinese(36,6,6);//：
+ 328   2          
+ 329   2          OLED_ShowNum(40,3,Heart,3,16);
+ 330   2          OLED_ShowCHinese(65,3,7);
+ 331   2          OLED_ShowChar(82,3,'/',16);
+ 332   2          OLED_ShowCHinese(91,3,8);
+ 333   2          OLED_ShowCHinese(110,3,9);
+ 334   2          
+ 335   2          OLED_ShowNum(40,6,Spo2,3,16);
+ 336   2          OLED_ShowChar(65,6,'%',16);
+ 337   2          delay_ms(50);
+ 338   2        }
+ 339   1      }
+*** WARNING C280 IN LINE 276 OF main.c: 'i': unreferenced local variable
+ 340          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2207    ----
+   CONSTANT SIZE    =    124    ----
+   XDATA SIZE       =     84      37
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+C51 COMPILER V9.54   MAIN                                                                  04/26/2022 22:30:01 PAGE 7   
+
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,12 @@
+".\list\main.obj",
+".\list\STC8G_H_Soft_I2C.obj",
+".\list\ADC.obj",
+".\list\I2C.obj",
+".\list\UART.obj",
+".\list\delay.obj",
+".\list\GPIO.obj",
+".\list\Max30102.obj",
+".\list\oled.obj" 
+TO ".\list\IO-LED" 
+
+PRINT(".\list\IO-LED.map") REMOVEUNUSED 
